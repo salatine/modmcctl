@@ -9,10 +9,6 @@ import (
 	"sync"
 )
 
-func usage() {
-	fmt.Printf("usage:\n%s --version=1.21.11 --loader=fabric [--mode=client|server|both] [--provider=modrinth|curseforge] [--mods=mod1,mod2,mod3]\n", os.Args[0])
-}
-
 func main() {
 	mode := flag.String("mode", "client", "client|server|both")
 	clientDirFlag := flag.String("client-dir", "", ".minecraft client absolute path")
@@ -24,7 +20,7 @@ func main() {
 	flag.Parse()
 
 	if *version == "" || *loader == "" {
-		usage()
+		flag.Usage()
 		os.Exit(1)
 	}
 
