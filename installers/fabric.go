@@ -77,7 +77,7 @@ func installFabric(mode, clientDir, serverDir, mcVersion string) error {
 	installerURL := latestInstaller.URL
 
 	install := func(dir string, installType string) error {
-		fmt.Printf("Installing Fabric (%s)... ", installType)
+		fmt.Printf("Installing Fabric (%s)... \n", installType)
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err
 		}

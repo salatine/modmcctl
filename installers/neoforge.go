@@ -54,7 +54,7 @@ func installNeoForge(mode, clientDir, serverDir, mcVersion string) error {
 			return nil
 		}
 
-		fmt.Printf("Installing NeoForge %s (%s)... ", version, installType)
+		fmt.Printf("Installing NeoForge %s (%s)... \n", version, installType)
 		cli.EnsureDir(dir)
 		installer := filepath.Join(dir, "neoforge-installer.jar")
 		url := fmt.Sprintf("https://maven.neoforged.net/releases/net/neoforged/neoforge/%s/neoforge-%s-installer.jar", version, version)
