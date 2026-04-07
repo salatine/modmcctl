@@ -1,8 +1,4 @@
-package main
-
-type Mod struct {
-	Slug string
-}
+package installers
 
 type MavenMetadata struct {
 	Versioning struct {
@@ -14,6 +10,3 @@ type MavenMetadata struct {
 	} `xml:"versioning"`
 }
 
-type ModProvider interface {
-	FetchMod(slug, mcVersion, loader string) (url, filename string, err error)
-}

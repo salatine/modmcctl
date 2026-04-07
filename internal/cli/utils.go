@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func normalizeMCVersion(v string) string {
+func NormalizeMCVersion(v string) string {
 	parts := strings.Split(v, ".")
 	if len(parts) >= 2 {
 		return parts[0] + "." + parts[1]
@@ -19,7 +19,7 @@ func normalizeMCVersion(v string) string {
 	return v
 }
 
-func getClientDir(custom string) string {
+func GetClientDir(custom string) string {
 	if custom != "" {
 		return custom
 	}
@@ -30,7 +30,7 @@ func getClientDir(custom string) string {
 	return filepath.Join(home, ".minecraft")
 }
 
-func getServerDir(custom string) string {
+func GetServerDir(custom string) string {
 	if custom != "" {
 		return custom
 	}
@@ -41,11 +41,11 @@ func getServerDir(custom string) string {
 	return filepath.Join(home, ".minecraftserver")
 }
 
-func ensureDir(path string) {
+func EnsureDir(path string) {
 	os.MkdirAll(path, os.ModePerm)
 }
 
-func downloadFile(url, path string) error {
+func DownloadFile(url, path string) error {
 	var lastErr error
 	for i := 0; i < 3; i++ {
 		resp, err := http.Get(url)
