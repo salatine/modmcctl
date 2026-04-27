@@ -7,14 +7,14 @@ import (
 	"strings"
 	"path/filepath"
 	"github.com/salatine/modmcctl/internal/cli"
-	"github.com/salatine/modmcctl/installers"
+	"github.com/salatine/modmcctl/loaders"
 	"github.com/salatine/modmcctl/providers"
 )
 
 func Run(cfg *cli.Config) error {
 	modsDirs := resolveModsDirs(cfg)
 
-	if err := installers.InstallLoader(
+	if err := loaders.InstallLoader(
 		cfg.Loader,
 		cfg.Mode,
 		cfg.ClientDir,
@@ -65,24 +65,42 @@ func downloadMods(p providers.ModProvider, cfg *cli.Config, modsDirs []string) e
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			url, filename, err := p.FetchMod(s, cfg.Version, cfg.Loader)
+			fileDownload, isModpack, err := p.Fetch(s, cfg.Version, cfg.Loader)
 			if err != nil {
 				fmt.Println("error:", err)
 				return
 			}
 
-			for _, dir := range modsDirs {
-				cli.EnsureDir(dir)
-				path := filepath.Join(dir, filename)
+			download := func(modDownload *providers.ModDownload, dirs []string) {
+				for _, dir := range dirs {
+					cli.EnsureDir(dir)
+					path := filepath.Join(dir, modDownload.Filename)
 
-				if _, err := os.Stat(path); err == nil {
-					fmt.Println("skip:", filename)
-					continue
+					if _, err := os.Stat(path); err == nil {
+						fmt.Println("skip:", modDownload.Filename)
+						continue
+					}
+
+					fmt.Println("downloading:", modDownload.Filename)
+					cli.DownloadFile(modDownload.URL, path)
+				}
+			}
+
+			if isModpack {
+				var mods []*providers.ModDownload
+				if mods, err = p.FetchModpack(fileDownload); err != nil {
+					fmt.Println("error:", err)
+					return
 				}
 
-				fmt.Println("downloading:", filename)
-				cli.DownloadFile(url, path)
+				for _, mod := range mods {
+					download(mod, modsDirs)
+				}
+			} else {
+				download(fileDownload, modsDirs)
 			}
+
+
 		}(slug)
 	}
 

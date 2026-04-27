@@ -1,4 +1,4 @@
-package installers
+package loaders
 
 type MavenMetadata struct {
 	Versioning struct {

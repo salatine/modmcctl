@@ -22,7 +22,7 @@ func ParseConfig() *Config {
 	version := Required(Flag("version", "", "minecraft version", nil))
 	loader := Required(Flag("loader", "", "neoforge|fabric", Contains("not supported loader", "neoforge", "fabric")))
 	providerName, _ := Flag("provider", "modrinth", "modrinth|curseforge", Contains("not supported provider", "modrinth", "curseforge"))
-	modsFlag := Required(Flag("mods", "", "list of mods slugs/names, separated by comma", nil))
+	modsFlag := Required(Flag("mods", "", "list of mod/modpack slugs or names, separated by comma", nil))
 
 	flag.Parse()
 	Validate()
