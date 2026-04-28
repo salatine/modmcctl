@@ -71,7 +71,7 @@ func downloadMods(p providers.ModProvider, cfg *cli.Config, modsDirs []string) e
 				return
 			}
 
-			download := func(modDownload *providers.ModDownload, dirs []string) {
+			download := func(modDownload *providers.Downloadable, dirs []string) {
 				for _, dir := range dirs {
 					cli.EnsureDir(dir)
 					path := filepath.Join(dir, modDownload.Filename)
@@ -87,7 +87,7 @@ func downloadMods(p providers.ModProvider, cfg *cli.Config, modsDirs []string) e
 			}
 
 			if isModpack {
-				var mods []*providers.ModDownload
+				var mods []*providers.Downloadable
 				if mods, err = p.FetchModpack(fileDownload); err != nil {
 					fmt.Println("error:", err)
 					return

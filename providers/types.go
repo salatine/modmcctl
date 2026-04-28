@@ -1,11 +1,11 @@
 package providers
 
-type ModDownload struct {
+type Downloadable struct {
 	URL string
 	Filename string
 }
 
 type ModProvider interface {
-	Fetch(slug, mcVersion, loader string) (mod *ModDownload, isModpack bool, err error)
-	FetchModpack(pack *ModDownload) (mods []*ModDownload, err error)
+	Fetch(slug, mcVersion, loader string) (mod *Downloadable, isModpack bool, err error)
+	FetchModpack(pack *Downloadable) (mods []*Downloadable, err error)
 }

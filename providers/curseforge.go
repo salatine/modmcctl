@@ -44,7 +44,7 @@ type curseForgeManifest struct {
 
 type CurseForgeProvider struct{}
 
-func (p *CurseForgeProvider) Fetch(slug, mcVersion, loader string) (mod *ModDownload, isModpack bool, err error) {
+func (p *CurseForgeProvider) Fetch(slug, mcVersion, loader string) (mod *Downloadable, isModpack bool, err error) {
 	apiKey := os.Getenv("CURSEFORGE_API_KEY")
 	if apiKey == "" {
 		return nil, false, fmt.Errorf("CURSEFORGE_API_KEY not set")
@@ -103,7 +103,7 @@ func (p *CurseForgeProvider) Fetch(slug, mcVersion, loader string) (mod *ModDown
 			if gv == mcVersion && (targetLoaderID == 0 || int(lID) == targetLoaderID) {
 				fileID := int(entry["fileId"].(float64))
 				filename := entry["filename"].(string)
-				mod = &ModDownload{
+				mod = &Downloadable{
 					URL: p.buildCurseforgeURL(fileID, filename),
 					Filename: filename,
 				}
@@ -124,7 +124,7 @@ func (p *CurseForgeProvider) buildCurseforgeURL(fileID int, fileName string) str
 	return fmt.Sprintf("https://edge.forgecdn.net/files/%s/%s/%s", idStr[:len(idStr)-3], idStr[len(idStr)-3:], fileName)
 }
 
-func (p *CurseForgeProvider) FetchModpack(pack *ModDownload) ([]*ModDownload, error) {
+func (p *CurseForgeProvider) FetchModpack(pack *Downloadable) ([]*Downloadable, error) {
 	if err := downloadFile(pack.Filename, pack.URL); err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (p *CurseForgeProvider) FetchModpack(pack *ModDownload) ([]*ModDownload, er
 				return nil, err
 			}
 
-			var mods []*ModDownload
+			var mods []*Downloadable
 
 			for _, file := range manifest.Files {
 				url, filename, err := p.resolveCurseForgeFile(file.ProjectID, file.FileID)
@@ -157,7 +157,7 @@ func (p *CurseForgeProvider) FetchModpack(pack *ModDownload) ([]*ModDownload, er
 					return nil, err
 				}
 
-				mods = append(mods, &ModDownload{
+				mods = append(mods, &Downloadable{
 					URL:      url,
 					Filename: filename,
 				})

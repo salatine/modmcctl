@@ -43,7 +43,7 @@ type ModVersion struct {
 
 type ModrinthProvider struct{}
 
-func (p *ModrinthProvider) Fetch(slug, mcVersion, loader string) (mod *ModDownload, isModpack bool, err error) {
+func (p *ModrinthProvider) Fetch(slug, mcVersion, loader string) (mod *Downloadable, isModpack bool, err error) {
 	searchURL := fmt.Sprintf("https://api.modrinth.com/v2/project/%s", slug)
 	resp, err := http.Get(searchURL)
 	if err != nil {
@@ -117,7 +117,7 @@ func (p *ModrinthProvider) Fetch(slug, mcVersion, loader string) (mod *ModDownlo
 		return nil, false, fmt.Errorf("no compatible version found for loader %s and mc version %s", loader, mcVersion)
 	}
 
-	mod = &ModDownload{
+	mod = &Downloadable{
 		URL: latestVersion.Files[0].URL,
 		Filename: latestVersion.Files[0].Filename,
 	}
@@ -125,7 +125,7 @@ func (p *ModrinthProvider) Fetch(slug, mcVersion, loader string) (mod *ModDownlo
 	return mod, isModrinthModpack(project.ProjectType), nil
 }
 
-func (p *ModrinthProvider) FetchModpack(pack *ModDownload) ([]*ModDownload, error) {
+func (p *ModrinthProvider) FetchModpack(pack *Downloadable) ([]*Downloadable, error) {
 	if err := downloadFile(pack.Filename, pack.URL); err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func (p *ModrinthProvider) FetchModpack(pack *ModDownload) ([]*ModDownload, erro
 				return nil, err
 			}
 
-			var mods []*ModDownload
+			var mods []*Downloadable
 			for _, file := range manifest.Files {
 				if len(file.Downloads) == 0 {
 					continue
@@ -166,7 +166,7 @@ func (p *ModrinthProvider) FetchModpack(pack *ModDownload) ([]*ModDownload, erro
 					continue
 				}
 
-				mods = append(mods, &ModDownload{
+				mods = append(mods, &Downloadable{
 					URL:      file.Downloads[0],
 					Filename: filename,
 				})
