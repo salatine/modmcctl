@@ -125,7 +125,7 @@ func (p *ModrinthProvider) Fetch(slug, mcVersion, loader string) (mod *Downloada
 	return mod, isModrinthModpack(project.ProjectType), nil
 }
 
-func (p *ModrinthProvider) FetchModpack(pack *Downloadable) ([]*Downloadable, error) {
+func (p *ModrinthProvider) FetchModpack(pack *Downloadable, destDir string) ([]*Downloadable, error) {
 	if err := downloadFile(pack.Filename, pack.URL); err != nil {
 		return nil, err
 	}
@@ -136,6 +136,10 @@ func (p *ModrinthProvider) FetchModpack(pack *Downloadable) ([]*Downloadable, er
 		return nil, err
 	}
 	defer r.Close()
+
+	if err := extractOverridesFromZip(r, destDir); err != nil {
+		return nil, err
+	}
 
 	for _, f := range r.File {
 		if f.Name == MODRINTH_MANIFEST_FILE {

@@ -124,7 +124,7 @@ func (p *CurseForgeProvider) buildCurseforgeURL(fileID int, fileName string) str
 	return fmt.Sprintf("https://edge.forgecdn.net/files/%s/%s/%s", idStr[:len(idStr)-3], idStr[len(idStr)-3:], fileName)
 }
 
-func (p *CurseForgeProvider) FetchModpack(pack *Downloadable) ([]*Downloadable, error) {
+func (p *CurseForgeProvider) FetchModpack(pack *Downloadable, destDir string) ([]*Downloadable, error) {
 	if err := downloadFile(pack.Filename, pack.URL); err != nil {
 		return nil, err
 	}
@@ -135,6 +135,10 @@ func (p *CurseForgeProvider) FetchModpack(pack *Downloadable) ([]*Downloadable, 
 		return nil, err
 	}
 	defer r.Close()
+
+	if err := extractOverridesFromZip(r, destDir); err != nil {
+		return nil, err
+	}
 
 	for _, f := range r.File {
 		if f.Name == CURSEFORGE_MANIFEST_FILE {

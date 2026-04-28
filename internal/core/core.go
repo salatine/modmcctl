@@ -50,6 +50,11 @@ func resolveProvider(name string) providers.ModProvider {
 }
 
 func downloadMods(p providers.ModProvider, cfg *cli.Config, modsDirs []string) error {
+	var mcDirs []string
+	for _, modsDir := range modsDirs {
+		mcDirs = append(mcDirs, filepath.Dir(modsDir))
+	}
+
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 5)
 
@@ -71,26 +76,13 @@ func downloadMods(p providers.ModProvider, cfg *cli.Config, modsDirs []string) e
 				return
 			}
 
-			download := func(modDownload *providers.Downloadable, dirs []string) {
-				for _, dir := range dirs {
-					cli.EnsureDir(dir)
-					path := filepath.Join(dir, modDownload.Filename)
-
-					if _, err := os.Stat(path); err == nil {
-						fmt.Println("skip:", modDownload.Filename)
-						continue
-					}
-
-					fmt.Println("downloading:", modDownload.Filename)
-					cli.DownloadFile(modDownload.URL, path)
-				}
-			}
-
 			if isModpack {
 				var mods []*providers.Downloadable
-				if mods, err = p.FetchModpack(fileDownload); err != nil {
-					fmt.Println("error:", err)
-					return
+				for _, mcDir := range mcDirs {
+					if mods, err = p.FetchModpack(fileDownload, mcDir); err != nil {
+						fmt.Println("error:", err)
+						return
+					}
 				}
 
 				for _, mod := range mods {
@@ -106,4 +98,19 @@ func downloadMods(p providers.ModProvider, cfg *cli.Config, modsDirs []string) e
 
 	wg.Wait()
 	return nil
+}
+
+func download(downloadable *providers.Downloadable, dirs []string) {
+	for _, dir := range dirs {
+		cli.EnsureDir(dir)
+		path := filepath.Join(dir, downloadable.Filename)
+
+		if _, err := os.Stat(path); err == nil {
+			fmt.Println("skip:", downloadable.Filename)
+			continue
+		}
+
+		fmt.Println("downloading:", downloadable.Filename)
+		cli.DownloadFile(downloadable.URL, path)
+	}
 }
