@@ -6,14 +6,48 @@ import (
 	"net/http"
 	"encoding/json"
 	"strings"
+	"io"
+	"archive/zip"
 )
+
+const CURSEFORGE_MANIFEST_FILE = "manifest.json"
+
+func isCurseForgeModpack(classID float64) bool {
+	return int(classID) == 4471
+}
+
+func downloadFile(path, url string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	out, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	return err
+}
+
+type curseForgeFile struct {
+	ProjectID int `json:"projectID"`
+	FileID int `json:"fileID"`
+}
+
+type curseForgeManifest struct {
+	Files []curseForgeFile `json:"files"`
+}
 
 type CurseForgeProvider struct{}
 
-func (p *CurseForgeProvider) FetchMod(slug, mcVersion, loader string) (string, string, error) {
+func (p *CurseForgeProvider) Fetch(slug, mcVersion, loader string) (mod *Downloadable, isModpack bool, err error) {
 	apiKey := os.Getenv("CURSEFORGE_API_KEY")
 	if apiKey == "" {
-		return "", "", fmt.Errorf("CURSEFORGE_API_KEY not set")
+		return nil, false, fmt.Errorf("CURSEFORGE_API_KEY not set")
 	}
 
 	client := &http.Client{}
@@ -23,30 +57,32 @@ func (p *CurseForgeProvider) FetchMod(slug, mcVersion, loader string) (string, s
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", "", err
+		return nil, false, err
 	}
 	defer resp.Body.Close()
 
 	var search map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&search); err != nil {
-		return "", "", err
+		return nil, false, err
 	}
 
 	dataRaw, ok := search["data"].([]interface{})
 	if !ok || len(dataRaw) == 0 {
-		return "", "", fmt.Errorf("mod not found: %s", slug)
+		return nil, false, fmt.Errorf("mod not found: %s", slug)
 	}
-
+	
 	var modData map[string]interface{}
+	var classID float64
 	for _, m := range dataRaw {
 		mMap := m.(map[string]interface{})
-		if classID, ok := mMap["classId"].(float64); ok && classID == 6 {
+		if classID, ok = mMap["classId"].(float64); ok {
 			modData = mMap
 			break
 		}
 	}
-	if modData == nil {
-		modData = dataRaw[0].(map[string]interface{})
+
+	if classID != 6 && classID != 4471 {
+		return nil, false, fmt.Errorf("unsupported CurseForge class ID: %d", classID)
 	}
 
 	targetLoaderID := 0
@@ -67,15 +103,20 @@ func (p *CurseForgeProvider) FetchMod(slug, mcVersion, loader string) (string, s
 			if gv == mcVersion && (targetLoaderID == 0 || int(lID) == targetLoaderID) {
 				fileID := int(entry["fileId"].(float64))
 				filename := entry["filename"].(string)
-				return buildCurseforgeURL(fileID, filename), filename, nil
+				mod = &Downloadable{
+					URL: p.buildCurseforgeURL(fileID, filename),
+					Filename: filename,
+				}
+
+				return mod, isCurseForgeModpack(classID), nil
 			}
 		}
 	}
 
-	return "", "", fmt.Errorf("no compatible version for %s", slug)
+	return nil, false, fmt.Errorf("no compatible version for %s", slug)
 }
 
-func buildCurseforgeURL(fileID int, fileName string) string {
+func (p *CurseForgeProvider) buildCurseforgeURL(fileID int, fileName string) string {
 	idStr := fmt.Sprintf("%d", fileID)
 	if len(idStr) < 4 {
 		return ""
@@ -83,3 +124,91 @@ func buildCurseforgeURL(fileID int, fileName string) string {
 	return fmt.Sprintf("https://edge.forgecdn.net/files/%s/%s/%s", idStr[:len(idStr)-3], idStr[len(idStr)-3:], fileName)
 }
 
+func (p *CurseForgeProvider) FetchModpack(pack *Downloadable, destDir string) ([]*Downloadable, error) {
+	if err := downloadFile(pack.Filename, pack.URL); err != nil {
+		return nil, err
+	}
+	defer os.Remove(pack.Filename)
+
+	r, err := zip.OpenReader(pack.Filename)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	if err := extractOverridesFromZip(r, destDir); err != nil {
+		return nil, err
+	}
+
+	for _, f := range r.File {
+		if f.Name == CURSEFORGE_MANIFEST_FILE {
+			rc, err := f.Open()
+			if err != nil {
+				return nil, err
+			}
+			defer rc.Close()
+
+			var manifest curseForgeManifest
+			if err := json.NewDecoder(rc).Decode(&manifest); err != nil {
+				return nil, err
+			}
+
+			var mods []*Downloadable
+
+			for _, file := range manifest.Files {
+				url, filename, err := p.resolveCurseForgeFile(file.ProjectID, file.FileID)
+				if err != nil {
+					return nil, err
+				}
+
+				mods = append(mods, &Downloadable{
+					URL:      url,
+					Filename: filename,
+				})
+			}
+
+			return mods, nil
+		}
+	}
+
+	return nil, fmt.Errorf("%s not found", CURSEFORGE_MANIFEST_FILE)
+}
+
+func (p *CurseForgeProvider) resolveCurseForgeFile(projectID, fileID int) (string, string, error) {
+	apiKey := os.Getenv("CURSEFORGE_API_KEY")
+	if apiKey == "" {
+		return "", "", fmt.Errorf("CURSEFORGE_API_KEY not set")
+	}
+
+	url := fmt.Sprintf("https://api.curseforge.com/v1/mods/%d/files/%d", projectID, fileID)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("x-api-key", apiKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	var data struct {
+		Data struct {
+			FileName    string `json:"fileName"`
+			DownloadURL string `json:"downloadUrl"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return "", "", err
+	}
+
+	if data.Data.DownloadURL == "" {
+		url := p.buildCurseforgeURL(fileID, data.Data.FileName)
+		if url == "" {
+			return "", "", fmt.Errorf("no download URL")
+		}
+
+		return url, data.Data.FileName, nil
+	}
+
+	return data.Data.DownloadURL, data.Data.FileName, nil
+}

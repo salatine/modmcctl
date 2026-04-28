@@ -7,14 +7,14 @@ import (
 	"strings"
 	"path/filepath"
 	"github.com/salatine/modmcctl/internal/cli"
-	"github.com/salatine/modmcctl/installers"
+	"github.com/salatine/modmcctl/loaders"
 	"github.com/salatine/modmcctl/providers"
 )
 
 func Run(cfg *cli.Config) error {
 	modsDirs := resolveModsDirs(cfg)
 
-	if err := installers.InstallLoader(
+	if err := loaders.InstallLoader(
 		cfg.Loader,
 		cfg.Mode,
 		cfg.ClientDir,
@@ -50,6 +50,11 @@ func resolveProvider(name string) providers.ModProvider {
 }
 
 func downloadMods(p providers.ModProvider, cfg *cli.Config, modsDirs []string) error {
+	var mcDirs []string
+	for _, modsDir := range modsDirs {
+		mcDirs = append(mcDirs, filepath.Dir(modsDir))
+	}
+
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 5)
 
@@ -65,27 +70,47 @@ func downloadMods(p providers.ModProvider, cfg *cli.Config, modsDirs []string) e
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			url, filename, err := p.FetchMod(s, cfg.Version, cfg.Loader)
+			fileDownload, isModpack, err := p.Fetch(s, cfg.Version, cfg.Loader)
 			if err != nil {
 				fmt.Println("error:", err)
 				return
 			}
 
-			for _, dir := range modsDirs {
-				cli.EnsureDir(dir)
-				path := filepath.Join(dir, filename)
-
-				if _, err := os.Stat(path); err == nil {
-					fmt.Println("skip:", filename)
-					continue
+			if isModpack {
+				var mods []*providers.Downloadable
+				for _, mcDir := range mcDirs {
+					if mods, err = p.FetchModpack(fileDownload, mcDir); err != nil {
+						fmt.Println("error:", err)
+						return
+					}
 				}
 
-				fmt.Println("downloading:", filename)
-				cli.DownloadFile(url, path)
+				for _, mod := range mods {
+					download(mod, modsDirs)
+				}
+			} else {
+				download(fileDownload, modsDirs)
 			}
+
+
 		}(slug)
 	}
 
 	wg.Wait()
 	return nil
+}
+
+func download(downloadable *providers.Downloadable, dirs []string) {
+	for _, dir := range dirs {
+		cli.EnsureDir(dir)
+		path := filepath.Join(dir, downloadable.Filename)
+
+		if _, err := os.Stat(path); err == nil {
+			fmt.Println("skip:", downloadable.Filename)
+			continue
+		}
+
+		fmt.Println("downloading:", downloadable.Filename)
+		cli.DownloadFile(downloadable.URL, path)
+	}
 }

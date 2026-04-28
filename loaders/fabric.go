@@ -1,4 +1,4 @@
-package installers
+package loaders
 
 import (
 	"encoding/json"
