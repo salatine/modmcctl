@@ -12,6 +12,12 @@ import (
 )
 
 func Run(cfg *cli.Config) error {
+	if cfg.ProfileName != "" {
+		if err := linkProfileDirs(cfg, cfg.ProfileName); err != nil {
+			return err
+		}
+	}
+
 	modsDirs := resolveModsDirs(cfg)
 
 	if err := loaders.InstallLoader(
